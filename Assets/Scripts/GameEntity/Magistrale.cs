@@ -1,13 +1,18 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
+using TowerBattle.Renderer;
 
 namespace TowerBattle
 {
+    [RequireComponent(typeof(LineRenderer))]
     public class Magistrale : MonoBehaviour
     {
-        [SerializeField] private Tower _firstTower;
-        [SerializeField] private Tower _secondTower;
+        private IRenderer _renderer;
+
+        private Tower _firstTower;
+        private Tower _secondTower;
+
         [SerializeField] private List<Transform> _points;
 
         [SerializeField] private List<(Transport, float)> _toTowerSecond = new List<(Transport, float)>();
@@ -19,7 +24,11 @@ namespace TowerBattle
 
         private void Awake()
         {
+            _firstTower = _points[0].transform.GetComponent<Tower>();
+            _secondTower = _points[_points.Count - 1].transform.GetComponent<Tower>();
             _curve = new Curve(_points.Select(x => x.position).ToArray());
+            _renderer = new PathRenderer(GetComponent<LineRenderer>(), _curve);
+            _renderer.Select();
         }
 
         private void Update()
@@ -34,12 +43,14 @@ namespace TowerBattle
             {
                 (Transport, float) unit = units[i];
                 unit.Item2 += speed;
-                if(unit.Item2 < 0 || unit.Item2 > 1)
+                unit.Item1.transform.position = _curve.GetPoint(unit.Item2);
+                units[i] = unit;
+
+                if (unit.Item2 < 0 || unit.Item2 > 1)
                 {
                     units.RemoveAt(i);
                     Destroy(unit.Item1.gameObject);
                 }
-                unit.Item1.transform.position = _curve.GetPoint(unit.Item2);
             }
         }
 
@@ -66,9 +77,9 @@ namespace TowerBattle
             return result;
         }
 
-        public void AcceptGroup(Tower tower, UnitGroup group)
+        public void AcceptGroup(Tower tower, UnitGroup group) //TODO
         {
-            var transport = new GameObject("Transport").AddComponent<Transport>();
+            var transport = Instantiate(General.Instance.GameResources.TransportPrefab);
             transport.group = group;
 
             if (tower == _firstTower)
@@ -87,6 +98,11 @@ namespace TowerBattle
             _curve = new Curve(_points.Select(x => x.position).ToArray());
             for (var i = 0f; i < 1f; i += 0.01f)
                 Gizmos.DrawLine(_curve.GetPoint(i), _curve.GetPoint(i += 0.01f));
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            _points.ForEach(x => Gizmos.DrawSphere(x.position, 0.5f));
         }
         #endregion
     }
